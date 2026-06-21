@@ -60,7 +60,10 @@ public sealed class ExportWorkflow
         Console.WriteLine("STEP 4/5 exporting FBX with Blender");
         Path fbx = exportOut / $"{request.CharacterId}_ue5.fbx";
         Path blenderLog = exportOut / $"{request.CharacterId}_ue5.blender.log";
-        await RunBlenderExportAsync(request, flver, anibnd, fbx, blenderLog);
+        Path? blenderTextureDir = null;
+        if (textures.Count > 0)
+            blenderTextureDir = textureOut;
+        await RunBlenderExportAsync(request, flver, anibnd, fbx, blenderLog, blenderTextureDir);
 
         Path? unrealScript = null;
         if (!request.SkipUnrealScript)
@@ -177,7 +180,7 @@ public sealed class ExportWorkflow
         return copied;
     }
 
-    private static async Task RunBlenderExportAsync(ExportRequest request, Path flver, Path anibnd, Path fbx, Path log)
+    private static async Task RunBlenderExportAsync(ExportRequest request, Path flver, Path anibnd, Path fbx, Path log, Path? textureDir)
     {
         Path script = new Path(AppContext.BaseDirectory) / "scripts" / "blender_export_character.py";
         RequireFile(script, "bundled Blender export script");
@@ -197,6 +200,9 @@ public sealed class ExportWorkflow
             "--armature-object-name", "root",
             "--apply-scale-options", "FBX_SCALE_UNITS",
         };
+
+        if (textureDir is not null)
+            args.AddRange(new[] { "--texture-dir", textureDir.Value.FullName });
 
         if (!string.IsNullOrWhiteSpace(request.SingleAnimation))
             args.AddRange(new[] { "--anim", request.SingleAnimation });
