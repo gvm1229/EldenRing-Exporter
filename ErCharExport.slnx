@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/ErCharExport/ErCharExport.csproj" />
+  <Project Path="tests/ErCharExport.Tests/ErCharExport.Tests.csproj" />
+</Solution>
+

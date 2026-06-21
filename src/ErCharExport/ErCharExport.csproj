@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>er-char-export</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="JKAnderson.Coremats" Version="0.0.0-2026.5.25.1.33.30" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\scripts\blender_export_character.py" Link="scripts\blender_export_character.py" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
+
