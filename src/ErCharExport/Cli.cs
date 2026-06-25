@@ -183,8 +183,7 @@ public static class Defaults
             var directory = new DirectoryInfo(start);
             while (directory is not null)
             {
-                if (File.Exists(System.IO.Path.Combine(directory.FullName, ".gitmodules")) &&
-                    Directory.Exists(System.IO.Path.Combine(directory.FullName, "src", "ErCharExport")))
+                if (IsRepoRoot(directory.FullName) || IsReleaseRoot(directory.FullName))
                 {
                     return directory.FullName;
                 }
@@ -194,4 +193,12 @@ public static class Defaults
 
         return Directory.GetCurrentDirectory();
     }
+
+    private static bool IsRepoRoot(string directory)
+        => File.Exists(System.IO.Path.Combine(directory, ".gitmodules")) &&
+           Directory.Exists(System.IO.Path.Combine(directory, "src", "ErCharExport"));
+
+    private static bool IsReleaseRoot(string directory)
+        => Directory.Exists(System.IO.Path.Combine(directory, "artifacts", "publish", "win-x64-self-contained")) &&
+           Directory.Exists(System.IO.Path.Combine(directory, "external"));
 }
