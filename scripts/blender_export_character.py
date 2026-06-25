@@ -33,7 +33,6 @@ def parse_args():
     parser.add_argument("--anim", default="")
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--source-scale", type=float, default=100.0)
-    parser.add_argument("--texture-dir", default="")
     parser.add_argument("--armature-object-name", default="root")
     parser.add_argument(
         "--apply-scale-options",
@@ -291,141 +290,6 @@ def prepare_for_unreal(armature, source_scale: float):
     return meshes
 
 
-def normalize_texture_stem(path: Path) -> str:
-    stem = path.stem.lower()
-    if stem.endswith("_l"):
-        stem = stem[:-2]
-    return stem
-
-
-def texture_group(stem: str) -> str:
-    if "weapon" in stem:
-        return "weapon"
-    if "hair" in stem or "fur" in stem:
-        return "fur"
-    return "body"
-
-
-def texture_kind(stem: str) -> str:
-    if stem.endswith("_a"):
-        return "base"
-    if stem.endswith("_n"):
-        return "normal"
-    if stem.endswith("_m"):
-        return "metallic"
-    if stem.endswith("_em"):
-        return "emissive"
-    if stem.endswith("_v"):
-        return "vector"
-    if stem.endswith("_1m"):
-        return "mask"
-    return "other"
-
-
-def material_group(material_name: str) -> str:
-    name = material_name.lower()
-    if "weapon" in name or name == "#01#":
-        return "weapon"
-    if "hair" in name or "haier" in name or "fur" in name or "shell" in name or "default" in name:
-        return "fur"
-    return "body"
-
-
-def load_texture_images(texture_dir: Path):
-    if not texture_dir or not texture_dir.is_dir():
-        print("BOUND_TEXTURES 0 reason=no_texture_dir", flush=True)
-        return {}
-
-    images = {}
-    failures = []
-    for path in sorted(texture_dir.glob("*.dds")):
-        stem = normalize_texture_stem(path)
-        group = texture_group(stem)
-        kind = texture_kind(stem)
-        if kind == "other":
-            continue
-        try:
-            image = bpy.data.images.load(str(path), check_existing=True)
-            if kind in {"normal", "metallic", "vector", "mask"}:
-                image.colorspace_settings.name = "Non-Color"
-            images[(group, kind)] = image
-        except Exception as ex:
-            failures.append(f"{path.name}: {ex}")
-
-    for failure in failures:
-        print(f"WARN_TEXTURE_LOAD {failure}", flush=True)
-    return images
-
-
-def new_texture_node(nodes, image, x, y):
-    node = nodes.new("ShaderNodeTexImage")
-    node.image = image
-    node.location = (x, y)
-    return node
-
-
-def bind_textures_to_materials(texture_dir_text: str):
-    texture_dir = Path(texture_dir_text) if texture_dir_text else None
-    images = load_texture_images(texture_dir) if texture_dir else {}
-    if not images:
-        print("BOUND_TEXTURES 0 reason=no_images", flush=True)
-        return
-
-    bound_materials = 0
-    bound_images = set()
-    for material in bpy.data.materials:
-        group = material_group(material.name)
-        group_images = {kind: image for (image_group, kind), image in images.items() if image_group == group}
-        if not group_images and group == "fur":
-            group_images = {kind: image for (image_group, kind), image in images.items() if image_group == "body"}
-        if not group_images:
-            continue
-
-        material.use_nodes = True
-        nodes = material.node_tree.nodes
-        links = material.node_tree.links
-        for node in list(nodes):
-            nodes.remove(node)
-
-        output = nodes.new("ShaderNodeOutputMaterial")
-        output.location = (500, 0)
-        bsdf = nodes.new("ShaderNodeBsdfPrincipled")
-        bsdf.location = (180, 0)
-        links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
-
-        if "base" in group_images:
-            node = new_texture_node(nodes, group_images["base"], -520, 120)
-            links.new(node.outputs["Color"], bsdf.inputs["Base Color"])
-            bound_images.add(group_images["base"].name)
-
-        if "normal" in group_images:
-            tex = new_texture_node(nodes, group_images["normal"], -720, -220)
-            normal = nodes.new("ShaderNodeNormalMap")
-            normal.location = (-300, -220)
-            links.new(tex.outputs["Color"], normal.inputs["Color"])
-            links.new(normal.outputs["Normal"], bsdf.inputs["Normal"])
-            bound_images.add(group_images["normal"].name)
-
-        if "metallic" in group_images:
-            tex = new_texture_node(nodes, group_images["metallic"], -720, -520)
-            sep = nodes.new("ShaderNodeSeparateColor")
-            sep.location = (-300, -520)
-            links.new(tex.outputs["Color"], sep.inputs["Color"])
-            links.new(sep.outputs["Red"], bsdf.inputs["Metallic"])
-            if "Roughness" in bsdf.inputs:
-                links.new(sep.outputs["Green"], bsdf.inputs["Roughness"])
-            bound_images.add(group_images["metallic"].name)
-
-        if "emissive" in group_images and "Emission Color" in bsdf.inputs:
-            node = new_texture_node(nodes, group_images["emissive"], -520, -820)
-            links.new(node.outputs["Color"], bsdf.inputs["Emission Color"])
-            bound_images.add(group_images["emissive"].name)
-
-        bound_materials += 1
-
-    print(f"BOUND_TEXTURES materials={bound_materials} images={len(bound_images)} dir={texture_dir}", flush=True)
-
-
 def export_fbx(fbx_path: Path, armature, meshes, apply_scale_options: str):
     print("BLENDER_PROGRESS 4/5 exporting FBX", flush=True)
     fbx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -494,10 +358,10 @@ def main():
     normalize_armature_object_name(armature, args.armature_object_name)
     entries = import_animations(anibnd, armature, args.character, args.anim, args.limit, args.source_scale)
     meshes = prepare_for_unreal(armature, args.source_scale)
-    bind_textures_to_materials(args.texture_dir)
     export_fbx(fbx, armature, meshes, args.apply_scale_options)
     print(f"DONE animations={len(entries)} meshes={len(meshes)} fbx={fbx}", flush=True)
 
 
 if __name__ == "__main__":
     main()
+
