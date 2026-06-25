@@ -92,6 +92,7 @@ public static class Cli
           --animation-binder <path-or-name>
           --anim <a000_001020>
           --limit-anims <count>
+          --format fbx|glb
           --texture-quality high|low|none
           --source-scale 100
           --skip-ue-script

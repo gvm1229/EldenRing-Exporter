@@ -58,17 +58,23 @@ public sealed class ExportWorkflow
             Console.WriteLine("STEP 3/5 skipping textures");
         }
 
-        Console.WriteLine("STEP 4/5 exporting FBX with Blender");
-        Path fbx = exportOut / $"{request.CharacterId}_ue5.fbx";
+        string artifactExtension = request.ExportFormat;
+        string artifactLabel = request.ExportFormat.ToUpperInvariant();
+        Console.WriteLine($"STEP 4/5 exporting {artifactLabel} with Blender");
+        Path exportedAsset = exportOut / $"{request.CharacterId}_ue5.{artifactExtension}";
         Path blenderLog = exportOut / $"{request.CharacterId}_ue5.blender.log";
-        await RunBlenderExportAsync(request, flver, anibnd, fbx, blenderLog);
+        await RunBlenderExportAsync(request, flver, anibnd, exportedAsset, blenderLog);
 
         Path? unrealScript = null;
-        if (!request.SkipUnrealScript)
+        if (!request.SkipUnrealScript && request.ExportFormat == "fbx")
         {
             Console.WriteLine("STEP 5/5 generating Unreal import script");
             unrealScript = ueOut / $"import_{request.CharacterId}_to_unreal.py";
-            await File.WriteAllTextAsync(unrealScript.Value.FullName, UnrealScriptGenerator.Generate(request.CharacterId, fbx, textureOut, request.TextureQuality));
+            await File.WriteAllTextAsync(unrealScript.Value.FullName, UnrealScriptGenerator.Generate(request.CharacterId, exportedAsset, textureOut, request.TextureQuality));
+        }
+        else if (!request.SkipUnrealScript)
+        {
+            Console.WriteLine("STEP 5/5 skipping Unreal import script for GLB export");
         }
         else
         {
@@ -79,10 +85,11 @@ public sealed class ExportWorkflow
             request.CharacterId,
             DateTimeOffset.UtcNow,
             request.SourceScale,
+            request.ExportFormat,
             character.Chrbnds.Single(),
             animationBinder,
             textureBinder,
-            fbx.FullName,
+            exportedAsset.FullName,
             blenderLog.FullName,
             textures.Select(path => path.FullName).Order().ToArray(),
             unrealScript?.FullName,
@@ -93,7 +100,7 @@ public sealed class ExportWorkflow
         await File.WriteAllTextAsync((characterOut / "manifest.json").FullName, JsonSerializer.Serialize(manifest, jsonOptions));
 
         Console.WriteLine("DONE");
-        Console.WriteLine($"FBX={fbx}");
+        Console.WriteLine($"{artifactLabel}={exportedAsset}");
         Console.WriteLine($"BLENDER_LOG={blenderLog}");
         if (unrealScript is not null)
             Console.WriteLine($"UNREAL_SCRIPT={unrealScript}");
@@ -183,7 +190,7 @@ public sealed class ExportWorkflow
         return copied;
     }
 
-    private static async Task RunBlenderExportAsync(ExportRequest request, Path flver, Path anibnd, Path fbx, Path log)
+    private static async Task RunBlenderExportAsync(ExportRequest request, Path flver, Path anibnd, Path output, Path log)
     {
         Path script = new Path(AppContext.BaseDirectory) / "scripts" / "blender_export_character.py";
         RequireFile(script, "bundled Blender export script");
@@ -197,7 +204,8 @@ public sealed class ExportWorkflow
             "--addon-root", request.SoulstructRoot.FullName,
             "--flver", flver.FullName,
             "--anibnd", anibnd.FullName,
-            "--fbx", fbx.FullName,
+            "--output", output.FullName,
+            "--format", request.ExportFormat,
             "--character", request.CharacterId,
             "--source-scale", request.SourceScale.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "--armature-object-name", "root",
@@ -212,10 +220,11 @@ public sealed class ExportWorkflow
         var result = await ProcessRunner.RunAsync(request.Blender.FullName, args, logPath: log);
         if (result.ExitCode != 0)
             throw new CliException($"Blender export failed with exit code {result.ExitCode}. Log: {log}");
-        if (!File.Exists(fbx.FullName) || new FileInfo(fbx.FullName).Length == 0)
-            throw new CliException($"Blender did not create a valid FBX: {fbx}. Log: {log}");
-        if (!result.Output.Contains("EXPORTED_FBX", StringComparison.Ordinal))
-            throw new CliException($"Blender finished without the EXPORTED_FBX success marker. Log: {log}");
+        if (!File.Exists(output.FullName) || new FileInfo(output.FullName).Length == 0)
+            throw new CliException($"Blender did not create a valid {request.ExportFormat.ToUpperInvariant()}: {output}. Log: {log}");
+        string successMarker = $"EXPORTED_{request.ExportFormat.ToUpperInvariant()}";
+        if (!result.Output.Contains(successMarker, StringComparison.Ordinal))
+            throw new CliException($"Blender finished without the {successMarker} success marker. Log: {log}");
         if (ContainsFatalBlenderImportError(result.Output))
             throw new CliException($"Blender reported an import/export exception. Log: {log}");
     }
@@ -231,7 +240,7 @@ public sealed class ExportWorkflow
             "Traceback (most recent call last):\r\n  File \"",
         ];
 
-        if (output.Contains("EXPORTED_FBX", StringComparison.Ordinal) &&
+        if (output.Contains("EXPORTED_", StringComparison.Ordinal) &&
             !output.Contains("FileNotFoundError:", StringComparison.Ordinal) &&
             !output.Contains("EntryNotFoundError:", StringComparison.Ordinal) &&
             !output.Contains("RuntimeError: Failed to import", StringComparison.Ordinal) &&
@@ -277,10 +286,11 @@ public sealed record ExportManifest(
     string CharacterId,
     DateTimeOffset CreatedUtc,
     double SourceScale,
+    string ExportFormat,
     string Chrbnd,
     string Anibnd,
     string? Texbnd,
-    string Fbx,
+    string ExportedAsset,
     string BlenderLog,
     IReadOnlyList<string> Textures,
     string? UnrealScript,

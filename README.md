@@ -1,12 +1,13 @@
 # Elden Ring Character Exporter
 
-Windows CLI tool for exporting Elden Ring character FLVER/HKX assets to UE-ready FBX.
+Windows CLI tool for exporting Elden Ring character FLVER/HKX assets to UE-ready FBX or Blender GLB.
 
 The current pipeline was validated on Red Wolf of Radagon (`c3181`) and Malenia (`c2120`). It uses the Red Wolf scale fix:
 
 - FLVER translation/position data is scaled before Blender import.
 - HKX skeleton and animation translations are scaled before Blender action creation.
 - FBX export uses `FBX_SCALE_UNITS`, scene scale `1.0`, action export, and no NLA strips.
+- GLB export uses the same imported/scaled scene and Blender's glTF `ACTIONS` animation export mode.
 
 ## Dependency Layout
 
@@ -95,6 +96,7 @@ Useful export flags:
 
 - `--anim a000_001020`: export one animation for quick testing.
 - `--limit-anims 2`: export the first N animations.
+- `--format fbx|glb`
 - `--texture-quality high|low|none`
 - `--animation-binder c2120.anibnd.dcx`
 - `--source-scale 100`
@@ -104,9 +106,8 @@ Useful export flags:
 
 Exports are written under `<out>\<character>\`:
 
-- `exports\<character>_ue5.fbx`
+- `exports\<character>_ue5.fbx` or `exports\<character>_ue5.glb`
 - `exports\<character>_ue5.blender.log`
 - `textures\high\*.dds` or `textures\low\*.dds`
 - `ue\import_<character>_to_unreal.py`
 - `manifest.json`
-

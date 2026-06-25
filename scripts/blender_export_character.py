@@ -24,11 +24,13 @@ class BatchLog:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Export an Elden Ring character FLVER/HKX set to UE-ready FBX.")
+    parser = argparse.ArgumentParser(description="Export an Elden Ring character FLVER/HKX set to FBX or GLB.")
     parser.add_argument("--addon-root", required=True)
     parser.add_argument("--flver", required=True)
     parser.add_argument("--anibnd", required=True)
-    parser.add_argument("--fbx", required=True)
+    parser.add_argument("--output")
+    parser.add_argument("--fbx")
+    parser.add_argument("--format", choices=("fbx", "glb"), default="fbx")
     parser.add_argument("--character", required=True)
     parser.add_argument("--anim", default="")
     parser.add_argument("--limit", type=int, default=0)
@@ -39,7 +41,13 @@ def parse_args():
         choices=("FBX_SCALE_NONE", "FBX_SCALE_UNITS", "FBX_SCALE_CUSTOM", "FBX_SCALE_ALL"),
         default="FBX_SCALE_UNITS",
     )
-    return parser.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
+    args = parser.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
+    if not args.output and not args.fbx:
+        parser.error("--output is required")
+    if args.fbx and not args.output:
+        args.output = args.fbx
+        args.format = "fbx"
+    return args
 
 
 def patch_background_gpu_imports():
@@ -260,10 +268,10 @@ def get_bound_meshes(armature):
     for obj in bpy.context.scene.objects:
         if obj.type != "MESH":
             continue
-        if obj.parent == armature:
+        if any(mod.type == "ARMATURE" and mod.object == armature for mod in obj.modifiers):
             meshes.append(obj)
             continue
-        if any(mod.type == "ARMATURE" and mod.object == armature for mod in obj.modifiers):
+        if obj.parent == armature and obj.vertex_groups:
             meshes.append(obj)
     if not meshes:
         raise RuntimeError(f"No meshes bound to armature {armature.name}")
@@ -340,12 +348,54 @@ def export_fbx(fbx_path: Path, armature, meshes, apply_scale_options: str):
     print(f"EXPORTED_FBX {fbx_path} size={fbx_path.stat().st_size} global_scale=1", flush=True)
 
 
+def export_glb(glb_path: Path, armature, meshes):
+    print("BLENDER_PROGRESS 4/5 exporting GLB", flush=True)
+    glb_path.parent.mkdir(parents=True, exist_ok=True)
+    prepare_actions_for_export(armature)
+
+    bpy.ops.object.mode_set(mode="OBJECT") if bpy.ops.object.mode_set.poll() else None
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in [armature, *meshes]:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = armature
+
+    bpy.ops.export_scene.gltf(
+        filepath=str(glb_path),
+        check_existing=False,
+        export_format="GLB",
+        use_selection=True,
+        export_yup=True,
+        export_apply=False,
+        export_materials="EXPORT",
+        export_image_format="AUTO",
+        export_texcoords=True,
+        export_normals=True,
+        export_tangents=False,
+        export_animations=True,
+        export_animation_mode="ACTIONS",
+        export_nla_strips=False,
+        export_frame_range=False,
+        export_frame_step=1,
+        export_force_sampling=True,
+        export_bake_animation=False,
+        export_skins=True,
+        export_def_bones=False,
+        export_all_influences=False,
+        export_morph=False,
+        export_cameras=False,
+        export_lights=False,
+    )
+    if not glb_path.is_file() or glb_path.stat().st_size == 0:
+        raise RuntimeError(f"GLB export failed or produced empty file: {glb_path}")
+    print(f"EXPORTED_GLB {glb_path} size={glb_path.stat().st_size} export_yup=True", flush=True)
+
+
 def main():
     args = parse_args()
     addon_root = Path(args.addon_root)
     flver = Path(args.flver)
     anibnd = Path(args.anibnd)
-    fbx = Path(args.fbx)
+    output = Path(args.output)
 
     for path in (addon_root, flver, anibnd):
         if not path.exists():
@@ -358,8 +408,11 @@ def main():
     normalize_armature_object_name(armature, args.armature_object_name)
     entries = import_animations(anibnd, armature, args.character, args.anim, args.limit, args.source_scale)
     meshes = prepare_for_unreal(armature, args.source_scale)
-    export_fbx(fbx, armature, meshes, args.apply_scale_options)
-    print(f"DONE animations={len(entries)} meshes={len(meshes)} fbx={fbx}", flush=True)
+    if args.format == "fbx":
+        export_fbx(output, armature, meshes, args.apply_scale_options)
+    else:
+        export_glb(output, armature, meshes)
+    print(f"DONE animations={len(entries)} meshes={len(meshes)} {args.format}={output}", flush=True)
 
 
 if __name__ == "__main__":

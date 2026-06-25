@@ -12,6 +12,7 @@ public sealed record ExportRequest(
     string? SingleAnimation,
     int LimitAnimations,
     string TextureQuality,
+    string ExportFormat,
     double SourceScale,
     bool SkipUnrealScript)
 {
@@ -20,6 +21,10 @@ public sealed record ExportRequest(
         string textureQuality = options.Get("texture-quality", "high").ToLowerInvariant();
         if (textureQuality is not ("high" or "low" or "none"))
             throw new CliException("--texture-quality must be high, low, or none.");
+
+        string exportFormat = options.Get("format", "fbx").ToLowerInvariant();
+        if (exportFormat is not ("fbx" or "glb"))
+            throw new CliException("--format must be fbx or glb.");
 
         return new ExportRequest(
             CharacterCatalog.NormalizeCharacterId(options.Require("character")),
@@ -33,8 +38,8 @@ public sealed record ExportRequest(
             options.GetOptional("anim"),
             options.GetInt("limit-anims", 0),
             textureQuality,
+            exportFormat,
             options.GetDouble("source-scale", 100.0),
             options.HasFlag("skip-ue-script"));
     }
 }
-
