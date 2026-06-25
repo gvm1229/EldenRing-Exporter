@@ -6,4 +6,8 @@ TestResults/
 .vs/
 artifacts/
 exports/
-
+external/soulstruct-blender-release/
+external/WitchyBND-release/
+external/WitchyBND/bin/
+external/WitchyBND/**/bin/
+external/WitchyBND/**/obj/

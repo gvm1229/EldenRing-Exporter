@@ -1,0 +1,9 @@
+[submodule "external/soulstruct-blender"]
+	path = external/soulstruct-blender
+	url = https://github.com/Grimrukh/soulstruct-blender.git
+[submodule "external/WitchyBND"]
+	path = external/WitchyBND
+	url = https://github.com/ividyon/WitchyBND.git
+[submodule "external/Nuxe"]
+	path = external/Nuxe
+	url = https://github.com/JKAnderson/Nuxe.git

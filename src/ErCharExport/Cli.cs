@@ -169,9 +169,29 @@ public static class Defaults
 {
     public const string GameDir = @"D:\SteamLibrary\steamapps\common\ELDEN RING\Game";
     public const string Blender = @"C:\Program Files\Blender Foundation\Blender 4.5\blender.exe";
-    public const string Witchy = @"D:\RE_EXTRACT\ELDEN_RING_EXTRACT\tools\WitchyBND-v3.0.0.1-win-x64\WitchyBND.exe";
-    public const string NuxeResDir = @"D:\RE_EXTRACT\ELDEN_RING_EXTRACT\tools\Nuxe.1.2.0\Nuxe 1.2.0\res";
-    public const string Soulstruct = @"D:\RE_EXTRACT\ELDEN_RING_EXTRACT\tools\io_soulstruct-2.6.0";
-    public const string OutDir = @"D:\RE_EXTRACT\ELDEN_RING_EXTRACT\exports";
-}
+    public static string Witchy => System.IO.Path.Combine(RepoRoot, "external", "WitchyBND-release", "WitchyBND-v3.0.0.1-win-x64", "WitchyBND.exe");
+    public static string NuxeResDir => System.IO.Path.Combine(RepoRoot, "external", "Nuxe", "dist", "res");
+    public static string Soulstruct => System.IO.Path.Combine(RepoRoot, "external", "soulstruct-blender-release", "io_soulstruct-2.6.0");
+    public static string OutDir => System.IO.Path.Combine(RepoRoot, "exports");
 
+    private static string RepoRoot => FindRepoRoot();
+
+    private static string FindRepoRoot()
+    {
+        foreach (string start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+        {
+            var directory = new DirectoryInfo(start);
+            while (directory is not null)
+            {
+                if (File.Exists(System.IO.Path.Combine(directory.FullName, ".gitmodules")) &&
+                    Directory.Exists(System.IO.Path.Combine(directory.FullName, "src", "ErCharExport")))
+                {
+                    return directory.FullName;
+                }
+                directory = directory.Parent;
+            }
+        }
+
+        return Directory.GetCurrentDirectory();
+    }
+}
