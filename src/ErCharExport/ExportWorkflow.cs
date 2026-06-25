@@ -29,7 +29,8 @@ public sealed class ExportWorkflow
         Directory.CreateDirectory(exportOut.FullName);
         Directory.CreateDirectory(ueOut.FullName);
 
-        var pathsToExtract = new List<string> { character.Chrbnds.Single(), animationBinder };
+        var pathsToExtract = new List<string> { character.Chrbnds.Single() };
+        pathsToExtract.AddRange(character.Anibnds);
         if (textureBinder is not null)
             pathsToExtract.Add(textureBinder);
 
@@ -119,8 +120,13 @@ public sealed class ExportWorkflow
         if (character.Anibnds.Count == 1)
             return character.Anibnds.Single();
 
+        string baseBinder = $"/chr/{character.Id}.anibnd.dcx";
+        string? exactBase = character.Anibnds.FirstOrDefault(path => string.Equals(path, baseBinder, StringComparison.OrdinalIgnoreCase));
+        if (exactBase is not null)
+            return exactBase;
+
         string choices = string.Join(Environment.NewLine, character.Anibnds.Select(path => $"  {path}"));
-        throw new CliException($"Multiple animation binders found for {character.Id}. Re-run export with --animation-binder:{Environment.NewLine}{choices}");
+        throw new CliException($"Multiple animation binders found for {character.Id} and no exact base binder exists. Re-run export with --animation-binder:{Environment.NewLine}{choices}");
     }
 
     private static string? SelectTextureBinder(CharacterInfo character, string textureQuality)
@@ -206,6 +212,35 @@ public sealed class ExportWorkflow
         var result = await ProcessRunner.RunAsync(request.Blender.FullName, args, logPath: log);
         if (result.ExitCode != 0)
             throw new CliException($"Blender export failed with exit code {result.ExitCode}. Log: {log}");
+        if (!File.Exists(fbx.FullName) || new FileInfo(fbx.FullName).Length == 0)
+            throw new CliException($"Blender did not create a valid FBX: {fbx}. Log: {log}");
+        if (!result.Output.Contains("EXPORTED_FBX", StringComparison.Ordinal))
+            throw new CliException($"Blender finished without the EXPORTED_FBX success marker. Log: {log}");
+        if (ContainsFatalBlenderImportError(result.Output))
+            throw new CliException($"Blender reported an import/export exception. Log: {log}");
+    }
+
+    private static bool ContainsFatalBlenderImportError(string output)
+    {
+        string[] fatalMarkers =
+        [
+            "FileNotFoundError:",
+            "EntryNotFoundError:",
+            "RuntimeError: Failed to import",
+            "RuntimeError: Failed to export",
+            "Traceback (most recent call last):\r\n  File \"",
+        ];
+
+        if (output.Contains("EXPORTED_FBX", StringComparison.Ordinal) &&
+            !output.Contains("FileNotFoundError:", StringComparison.Ordinal) &&
+            !output.Contains("EntryNotFoundError:", StringComparison.Ordinal) &&
+            !output.Contains("RuntimeError: Failed to import", StringComparison.Ordinal) &&
+            !output.Contains("RuntimeError: Failed to export", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return fatalMarkers.Any(marker => output.Contains(marker, StringComparison.Ordinal));
     }
 
     private static Path LocalPathFor(Path rawOut, string gamePath)

@@ -1,11 +1,9 @@
 @echo off
 setlocal
 
-rem Exports all known Malenia (c2120) animation binders.
-rem This creates three packages because c2120 has three ANIBND files:
-rem   c2120.anibnd.dcx
-rem   c2120_div00.anibnd.dcx
-rem   c2120_div01.anibnd.dcx
+rem Exports all Malenia (c2120) animations.
+rem c2120.anibnd.dcx is the base DivBinder; it pulls c2120_div00/c2120_div01
+rem when those sibling binders are extracted beside it.
 
 set "EXE=%~dp0artifacts\publish\win-x64-self-contained\er-char-export.exe"
 set "GAME_DIR=D:\SteamLibrary\steamapps\common\ELDEN RING\Game"
@@ -20,29 +18,21 @@ if not exist "%EXE%" (
     exit /b 1
 )
 
-call :export_binder base c2120.anibnd.dcx || exit /b %errorlevel%
-call :export_binder div00 c2120_div00.anibnd.dcx || exit /b %errorlevel%
-call :export_binder div01 c2120_div01.anibnd.dcx || exit /b %errorlevel%
-
 echo.
-echo DONE: Malenia exports written under "%OUT_ROOT%"
-exit /b 0
-
-:export_binder
-set "LABEL=%~1"
-set "BINDER=%~2"
-echo.
-echo === Exporting Malenia %LABEL% animations from %BINDER% ===
+echo === Exporting Malenia all animations from c2120.anibnd.dcx ===
 "%EXE%" export ^
   --character c2120 ^
-  --animation-binder "%BINDER%" ^
+  --animation-binder "c2120.anibnd.dcx" ^
   --game-dir "%GAME_DIR%" ^
   --blender "%BLENDER%" ^
   --witchy "%WITCHY%" ^
   --nuxe-res "%NUXE_RES%" ^
   --soulstruct "%SOULSTRUCT%" ^
-  --out "%OUT_ROOT%\%LABEL%" ^
+  --out "%OUT_ROOT%" ^
   --source-scale 100 ^
   --texture-quality high
-exit /b %errorlevel%
+if errorlevel 1 exit /b %errorlevel%
 
+echo.
+echo DONE: Malenia export written under "%OUT_ROOT%\c2120"
+exit /b 0
