@@ -54,6 +54,38 @@ Build the exporter:
 dotnet publish .\src\ErCharExport\ErCharExport.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\publish\win-x64-self-contained
 ```
 
+## Easiest Workflow
+
+For normal use, edit the variables at the top of:
+
+```powershell
+.\easy_export_character.py
+```
+
+Then run:
+
+```powershell
+python .\easy_export_character.py
+```
+
+or:
+
+```powershell
+.\easy_export_character.bat
+```
+
+The important editable variables are:
+
+- `CHARACTER_CODE`: target character, for example `c3181` or `c2120`.
+- `EXPORT_FORMAT`: `fbx` or `glb`; use `fbx` for Unreal skeletal animation imports.
+- `EXPORT_ALL_ANIMATIONS`: `False` for one animation, `True` for every animation in the selected binder.
+- `ANIMATION_NAME`: single-animation target, for example `a000_001020`.
+- `ANIMATION_BINDER`: optional binder override, for example `c2120.anibnd.dcx` for Malenia.
+- `SOURCE_SCALE`: `100` for the current UE-sized Red Wolf pipeline, `1` for 1/100 scale tests.
+- `GAME_DIR`, `BLENDER_EXE`, and `OUTPUT_ROOT`: machine-specific paths.
+
+The Python script is only a launcher. It calls the self-contained `er-char-export.exe`, so the extraction behavior is identical to the CLI path below.
+
 ## Example Export
 
 ```powershell
